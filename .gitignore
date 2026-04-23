@@ -1,0 +1,10 @@
+# Compiled Java bytecode
+*.class
+
+# Logs
+*.log
+
+# OS/editor artifacts
+.DS_Store
+.idea/
+.vscode/

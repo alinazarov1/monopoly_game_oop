@@ -1,13 +1,9 @@
 
 public class Player {
-    private String name;
+    private final String name;
     private int wallet;
     private int position;
     private int getOutOfJailFreeCards = 0;
-
-    enum Token {
-        A, B, C, D, E, G, H, I
-    }
 
     public Player(String name) {
         this.name = name;

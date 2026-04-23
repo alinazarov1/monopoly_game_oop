@@ -1,141 +1,327 @@
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import javax.swing.*;
 
-// Define the Tokens enum
-enum Tokens {
-    A, B, C, D, E, G, H, I
-}
-// Removed unused walletLabels variable
-
 public class MonopolyBoardSwing extends JFrame {
+    private static final int DESIGN_FRAME_WIDTH = 1400;
+    private static final int DESIGN_FRAME_HEIGHT = 900;
+    private static final int DESIGN_BOARD_PIXELS = 800;
+    private static double uiScale = 1.0;
+
     // Arrays to store property names
     private static Player[] players;
     private static int currentPlayerIndex = 0;
     private static JLabel[] playerTokens;
-    private static final int BOARD_SIZE = 40;
     private static JPanel playerPanel;
     private static JLabel[] walletLabels;
     private static JPanel[] playerPanels;
     private static final Chance chance = new Chance(); // Add this as a class variable
 
-    // Add these coordinate arrays to store token positions
-    private static final int[] xCoordinates = {
-            748, 678, 608, 538, 468, 398, 328, 258, 188, 118, 52, // Bottom row (0-10)
-            52, 52, 52, 52, 52, 52, 52, 52, 52, 52, // Left column (11-20)
-            52, 118, 188, 258, 328, 398, 468, 538, 608, 678, // Top row (21-30)
-            748, 748, 748, 748, 748, 748, 748, 748, 748, 748 // Right column (31-40)
-    };
+    private static int s(int value) {
+        return Math.max(1, (int) Math.round(value * uiScale));
+    }
 
-    private static final int[] yCoordinates = {
-            724, 724, 724, 724, 724, 724, 724, 724, 724, 724, 724, // Bottom row (0-10)
-            654, 584, 514, 444, 374, 304, 234, 164, 94, 28, // Left column (11-20)
-            28, 28, 28, 28, 28, 28, 28, 28, 28, 28, // Top row (21-30)
-            94, 164, 234, 304, 374, 444, 514, 584, 654, 724 // Right column (31-40)
-    };
+    private static void setScaledBounds(Component component, int x, int y, int width, int height) {
+        component.setBounds(s(x), s(y), s(width), s(height));
+    }
+
+    private static void updateScaleForScreen() {
+        Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
+        updateScaleForFrameSize(screen.width - 80, screen.height - 120);
+    }
+
+    private static void updateScaleForFrameSize(int frameWidth, int frameHeight) {
+        double widthScale = frameWidth / (double) DESIGN_FRAME_WIDTH;
+        double heightScale = frameHeight / (double) DESIGN_FRAME_HEIGHT;
+        uiScale = Math.min(widthScale, heightScale);
+        uiScale = Math.min(1.2, Math.max(0.55, uiScale));
+    }
+
+    private static void applyScaledLayout(
+            JPanel goPanel,
+            JPanel jailPanel,
+            JPanel freeParkingPanel,
+            JPanel goToJailPanel,
+            JPanel topRow,
+            JPanel bottomRow,
+            JPanel leftColumn,
+            JPanel rightColumn,
+            JPanel centerPanel,
+            JPanel dicePanel,
+            JButton rollDiceButton,
+            JPanel buttonPanel,
+            JPanel[] playerInfoPanels,
+            JSeparator verticalSeparator,
+            JSeparator[] horizontalSeparators,
+            int numberOfPlayers) {
+
+        setScaledBounds(goPanel, 696, 696, 103, 103);
+        setScaledBounds(jailPanel, 0, 696, 105, 103);
+        setScaledBounds(freeParkingPanel, 0, 2, 104, 100);
+        setScaledBounds(goToJailPanel, 696, 2, 104, 100);
+
+        setScaledBounds(topRow, 99, 3, 600, 100);
+        setScaledBounds(bottomRow, 98, 696, 602, 102);
+        setScaledBounds(leftColumn, 0, 99, 104, 600);
+        setScaledBounds(rightColumn, 694, 99, 104, 600);
+
+        setScaledBounds(centerPanel, 120, 120, 600, 600);
+        setScaledBounds(dicePanel, 130, 167, 340, 250);
+        setScaledBounds(rollDiceButton, 250, 370, 100, 30);
+
+        setScaledBounds(buttonPanel, 300, 800, 500, 50);
+        setScaledBounds(playerPanel, 850, 50, 450, 700);
+
+        for (int i = 0; i < playerInfoPanels.length; i++) {
+            setScaledBounds(playerInfoPanels[i],
+                    i < (numberOfPlayers + 1) / 2 ? 10 : 220,
+                    ((i % ((numberOfPlayers + 1) / 2)) * 150) + 10,
+                    200,
+                    120);
+        }
+
+        if (verticalSeparator != null) {
+            setScaledBounds(verticalSeparator, 213, 0, 10, ((numberOfPlayers + 1) / 2) * 150);
+        }
+
+        for (int i = 0; i < horizontalSeparators.length; i++) {
+            if (horizontalSeparators[i] != null) {
+                setScaledBounds(horizontalSeparators[i], 10, (i * 150) + 150, 380, 10);
+            }
+        }
+
+        if (playerTokens != null && players != null) {
+            int tokenSize = s(40);
+            for (int i = 0; i < playerTokens.length; i++) {
+                JLabel token = playerTokens[i];
+                if (token != null) {
+                    token.setSize(tokenSize, tokenSize);
+                    token.setFont(new Font("Arial", Font.BOLD, Math.max(12, s(16))));
+                    positionToken(token, players[i].getPosition());
+                }
+            }
+        }
+
+        playerPanel.revalidate();
+        playerPanel.repaint();
+    }
+
+    private static class BoardGridSection {
+        JPanel goPanel;
+        JPanel jailPanel;
+        JPanel freeParkingPanel;
+        JPanel goToJailPanel;
+        JPanel topRow;
+        JPanel bottomRow;
+        JPanel leftColumn;
+        JPanel rightColumn;
+    }
+
+    private static class PlayerPanelSection {
+        JPanel[] playerInfoPanels;
+        JSeparator[] horizontalSeparators;
+        JSeparator verticalSeparator;
+    }
+
+    private static BoardGridSection buildBoardGridSection(JPanel boardPanel, Space[] spaces) {
+        BoardGridSection section = new BoardGridSection();
+
+        section.goPanel = createGridSquare(spaces[0], s(103), s(103));
+        setScaledBounds(section.goPanel, 696, 696, 103, 103);
+        boardPanel.add(section.goPanel);
+
+        section.jailPanel = createGridSquare(spaces[10], s(105), s(103));
+        setScaledBounds(section.jailPanel, 0, 696, 105, 103);
+        boardPanel.add(section.jailPanel);
+
+        section.freeParkingPanel = createGridSquare(spaces[20], s(104), s(100));
+        setScaledBounds(section.freeParkingPanel, 0, 2, 104, 100);
+        boardPanel.add(section.freeParkingPanel);
+
+        section.goToJailPanel = createGridSquare(spaces[30], s(104), s(100));
+        setScaledBounds(section.goToJailPanel, 696, 2, 104, 100);
+        boardPanel.add(section.goToJailPanel);
+
+        section.topRow = createRow(spaces, 21, 9, s(57), s(104));
+        setScaledBounds(section.topRow, 99, 3, 600, 100);
+        boardPanel.add(section.topRow);
+
+        section.bottomRow = createRow(spaces, 1, 9, s(57), s(106));
+        setScaledBounds(section.bottomRow, 98, 696, 602, 102);
+        boardPanel.add(section.bottomRow);
+
+        section.leftColumn = createColumn(spaces, 11, 9, s(106), s(57));
+        setScaledBounds(section.leftColumn, 0, 99, 104, 600);
+        boardPanel.add(section.leftColumn);
+
+        section.rightColumn = createColumn(spaces, 31, 9, s(106), s(57));
+        setScaledBounds(section.rightColumn, 694, 99, 104, 600);
+        boardPanel.add(section.rightColumn);
+
+        return section;
+    }
+
+    private static PlayerPanelSection buildPlayerPanelSection(
+            JPanel boardPanel,
+            int numberOfPlayers,
+            Color[] tokenColors,
+            Tokens[] tokens) {
+
+        PlayerPanelSection section = new PlayerPanelSection();
+
+        playerPanel = new JPanel();
+        playerPanel.setLayout(null);
+        setScaledBounds(playerPanel, 850, 50, 450, 700);
+        playerPanel.setBackground(Color.WHITE);
+
+        walletLabels = new JLabel[numberOfPlayers];
+        playerPanels = new JPanel[numberOfPlayers];
+        section.playerInfoPanels = new JPanel[numberOfPlayers];
+        section.horizontalSeparators = new JSeparator[Math.max(0, numberOfPlayers - 1)];
+
+        for (int i = 0; i < numberOfPlayers; i++) {
+            Player player = new Player("Player " + (i + 1));
+
+            String name = player.getName();
+            int wallet = player.getWallet();
+            Tokens token = tokens[i];
+
+            Color tokenColor = tokenColors[i % tokenColors.length];
+
+            JPanel playerInfoPanel = new JPanel() {
+                @Override
+                protected void paintComponent(Graphics g) {
+                    super.paintComponent(g);
+                    g.setColor(tokenColor);
+                    g.fillOval(s(80), s(40), s(40), s(40));
+
+                    g.setColor(Color.WHITE);
+                    g.setFont(new Font("Arial", Font.BOLD, s(20)));
+                    g.drawString(String.valueOf(token), s(95), s(67));
+                }
+            };
+
+            playerInfoPanel.setLayout(new BoxLayout(playerInfoPanel, BoxLayout.Y_AXIS));
+            playerInfoPanel.setBackground(Color.LIGHT_GRAY);
+            setScaledBounds(playerInfoPanel,
+                    i < (numberOfPlayers + 1) / 2 ? 10 : 220,
+                    ((i % ((numberOfPlayers + 1) / 2)) * 150) + 10,
+                    200,
+                    120);
+
+            JLabel playerLabel = new JLabel(name);
+            JLabel walletLabel = new JLabel("Wallet: $" + wallet);
+            walletLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+            playerLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+            walletLabels[i] = walletLabel;
+            playerPanels[i] = playerInfoPanel;
+            section.playerInfoPanels[i] = playerInfoPanel;
+
+            playerInfoPanel.add(playerLabel);
+            playerInfoPanel.add(walletLabel);
+            playerPanel.add(playerInfoPanel);
+
+            if (i == (numberOfPlayers + 1) / 2 - 1) {
+                JSeparator separator = new JSeparator(SwingConstants.VERTICAL);
+                setScaledBounds(separator, 213, 0, 10, ((numberOfPlayers + 1) / 2) * 150);
+                separator.setForeground(Color.BLACK);
+                playerPanel.add(separator);
+                section.verticalSeparator = separator;
+            }
+
+            if (i < numberOfPlayers - 1) {
+                JSeparator separator = new JSeparator();
+                setScaledBounds(separator, 10, (i * 150) + 150, 380, 10);
+                playerPanel.add(separator);
+                section.horizontalSeparators[i] = separator;
+            }
+        }
+
+        boardPanel.add(playerPanel);
+        return section;
+    }
+
+    private static void configureTurnController(
+            JButton rollDiceButton,
+            Dice dice,
+            JPanel dicePanel,
+            JFrame frame,
+            int numberOfPlayers,
+            Space[] spaces) {
+
+        rollDiceButton.addActionListener(e -> {
+            boolean isFirstRoll = true;
+            for (int i = 1; i < playerTokens.length; i++) {
+                if (playerTokens[i].isVisible()) {
+                    isFirstRoll = false;
+                    break;
+                }
+            }
+            if (isFirstRoll) {
+                for (JLabel token : playerTokens) {
+                    token.setVisible(true);
+                }
+            }
+
+            dice.rollDice();
+            dicePanel.repaint();
+
+            Player currentPlayer = players[currentPlayerIndex];
+            int diceSum = dice.getDice1() + dice.getDice2();
+            int newPosition = (currentPlayer.getPosition() + diceSum) % BoardData.BOARD_SIZE;
+
+            movePlayer(currentPlayer, newPosition);
+
+            if (newPosition < currentPlayer.getPosition()) {
+                currentPlayer.setWallet(currentPlayer.getWallet() + 200);
+                JOptionPane.showMessageDialog(frame,
+                        currentPlayer.getName() + " passed GO! Collected $200",
+                        "Passed GO",
+                        JOptionPane.INFORMATION_MESSAGE);
+                updatePlayerPanel(currentPlayerIndex);
+            }
+
+            Space currentSpace = spaces[newPosition];
+            handlePropertyLanding(currentPlayer, currentSpace, frame);
+            currentPlayer.setPosition(newPosition);
+
+            currentPlayerIndex = (currentPlayerIndex + 1) % numberOfPlayers;
+            highlightCurrentPlayer(currentPlayerIndex);
+
+            JOptionPane.showMessageDialog(frame,
+                    "It's " + players[currentPlayerIndex].getName() + "'s turn!",
+                    "Next Turn",
+                    JOptionPane.INFORMATION_MESSAGE);
+        });
+    }
 
     public static void createMonopolyBoard(int numberOfPlayers) {
+        updateScaleForScreen();
+
         JFrame frame = new JFrame("Monopoly Board");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(1400, 900);
-        frame.setResizable(false);
+        frame.setSize(s(DESIGN_FRAME_WIDTH), s(DESIGN_FRAME_HEIGHT));
+        frame.setMinimumSize(new Dimension(900, 620));
+        frame.setResizable(true);
 
-        BackgroundPanel boardPanel = new BackgroundPanel("monopoly.png");
+        BoardBackgroundPanel boardPanel = new BoardBackgroundPanel("monopoly.png", () -> s(DESIGN_BOARD_PIXELS));
         boardPanel.setLayout(null);
 
         frame.setFocusable(true);
         boardPanel.setLayout(null);
 
-        // Create spaces (Space[])
-        Space[] spaces = new Space[40]; // 40 spaces on the board
-
-        // Populate the spaces array with all spaces
-        spaces[0] = new Space("GO", "Corner", "Collect $200 as you pass GO.");
-        spaces[1] = new Space("MEDITERRANEAN AVENUE", "Property", "Price: $60, Rent: $15");
-        spaces[2] = new Space("COMMUNITY CHEST", "Chance", "Draw a card from the deck.");
-        spaces[3] = new Space("BALTIC AVENUE", "Property", "Price: $60, Rent: $20");
-        spaces[4] = new Space("INCOME TAX", "Tax", "Pay $200 tax.");
-        spaces[5] = new Space("READING RAILROAD", "Railroad", "Price: $200, Rent: $50");
-        spaces[6] = new Space("ORIENTAL AVENUE", "Property", "Price: $100, Rent: $25");
-        spaces[7] = new Space("CHANCE", "Chance", "Draw a card from the deck.");
-        spaces[8] = new Space("VERMONT AVENUE", "Property", "Price: $100, Rent: $25");
-        spaces[9] = new Space("CONNECTICUT AVENUE", "Property", "Price: $120, Rent: $30");
-        spaces[10] = new Space("JAIL", "Corner", "Just visiting or go to Jail.");
-        spaces[11] = new Space("ST. CHARLES PLACE", "Property", "Price: $140, Rent: $35");
-        spaces[12] = new Space("ELECTRIC COMPANY", "Utility", "Price: $150, Rent: 4x roll of dice");
-        spaces[13] = new Space("STATES AVENUE", "Property", "Price: $140, Rent: $35");
-        spaces[14] = new Space("VIRGINIA AVENUE", "Property", "Price: $160, Rent: $40");
-        spaces[15] = new Space("PENNSYLVANIA RAILROAD", "Railroad", "Price: $200, Rent: $50");
-        spaces[16] = new Space("ST. JAMES PLACE", "Property", "Price: $180, Rent: $45");
-        spaces[17] = new Space("COMMUNITY CHEST", "Chance", "Draw a card from the deck.");
-        spaces[18] = new Space("TENNESSEE AVENUE", "Property", "Price: $180, Rent: $45");
-        spaces[19] = new Space("NEW YORK AVENUE", "Property", "Price: $200, Rent: $50");
-        spaces[20] = new Space("FREE PARKING", "Corner", "Free parking.");
-        spaces[21] = new Space("KENTUCKY AVENUE", "Property", "Price: $220, Rent: $55");
-        spaces[22] = new Space("CHANCE", "Chance", "Draw a card from the deck.");
-        spaces[23] = new Space("INDIANA AVENUE", "Property", "Price: $220, Rent: $55");
-        spaces[24] = new Space("ILLINOIS AVENUE", "Property", "Price: $240, Rent: $60");
-        spaces[25] = new Space("B&O RAILROAD", "Railroad", "Price: $200, Rent: $50");
-        spaces[26] = new Space("ATLANTIC AVENUE", "Property", "Price: $260, Rent: $65");
-        spaces[27] = new Space("VENTNOR AVENUE", "Property", "Price: $260, Rent: $65");
-        spaces[28] = new Space("WATER WORKS", "Utility", "Price: $150, Rent: 4x roll of dice");
-        spaces[29] = new Space("MARVIN GARDENS", "Property", "Price: $280, Rent: $70");
-        spaces[30] = new Space("GO TO JAIL", "Corner", "Go directly to Jail. Do not pass GO.");
-        spaces[31] = new Space("PACIFIC AVENUE", "Property", "Price: $300, Rent: $75");
-        spaces[32] = new Space("NORTH CAROLINA AVENUE", "Property", "Price: $300, Rent: $75");
-        spaces[33] = new Space("COMMUNITY CHEST", "Chance", "Draw a card from the deck.");
-        spaces[34] = new Space("PENNSYLVANIA AVENUE", "Property", "Price: $320, Rent: $80");
-        spaces[35] = new Space("SHORT LINE", "Railroad", "Price: $200, Rent: $50");
-        spaces[36] = new Space("CHANCE", "Chance", "Draw a card from the deck.");
-        spaces[37] = new Space("PARK PLACE", "Property", "Price: $350, Rent: $85");
-        spaces[38] = new Space("LUXURY TAX", "Tax", "Pay $100 tax.");
-        spaces[39] = new Space("BOARDWALK", "Property", "Price: $400, Rent: $100");
-
-        // Corner panels with hidden names
-
-        JPanel goPanel = createGridSquare(spaces[0], 103, 103);
-        goPanel.setBounds(696, 696, 103, 103);
-        boardPanel.add(goPanel);
-
-        JPanel jailPanel = createGridSquare(spaces[10], 105, 103);
-        jailPanel.setBounds(0, 696, 105, 103);
-        boardPanel.add(jailPanel);
-
-        JPanel freeParkingPanel = createGridSquare(spaces[20], 104, 100);
-        freeParkingPanel.setBounds(0, 2, 104, 100);
-        boardPanel.add(freeParkingPanel);
-
-        JPanel goToJailPanel = createGridSquare(spaces[30], 104, 100);
-        goToJailPanel.setBounds(696, 2, 104, 100);
-        boardPanel.add(goToJailPanel);
-
-        // Create rows and columns with hidden names
-        // Create rows and columns with hidden names
-        JPanel topRow = createRow(spaces, 21, 9, 57, 104);
-        topRow.setBounds(99, 3, 600, 100);
-        boardPanel.add(topRow);
-
-        // Bottom row (positions 1-9, drawn right to left)
-        JPanel bottomRow = createRow(spaces, 1, 9, 57, 106);
-        bottomRow.setBounds(98, 696, 602, 102);
-        boardPanel.add(bottomRow);
-
-        // Left column (positions 11-20, drawn bottom to top)
-        JPanel leftColumn = createColumn(spaces, 11, 9, 106, 57);
-        leftColumn.setBounds(0, 99, 104, 600);
-        boardPanel.add(leftColumn);
-
-        // Right column (positions 31-40, drawn top to bottom)
-        JPanel rightColumn = createColumn(spaces, 31, 9, 106, 57);
-        rightColumn.setBounds(694, 99, 104, 600);
-        boardPanel.add(rightColumn);
+        Space[] spaces = BoardData.createSpaces();
+        BoardGridSection boardGridSection = buildBoardGridSection(boardPanel, spaces);
 
         // Center Area (Middle of the board)
         JPanel centerPanel = new JPanel();
         centerPanel.setLayout(null);
         centerPanel.setOpaque(false);
-        centerPanel.setBounds(120, 120, 600, 600);
+        setScaledBounds(centerPanel, 120, 120, 600, 600);
 
         // Dice Panel
         Dice dice = new Dice();
@@ -144,24 +330,16 @@ public class MonopolyBoardSwing extends JFrame {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
-                dice.draw(g, 50, 50);
+                dice.draw(g, s(50), s(50));
             }
         };
-        dicePanel.setBounds(130, 167, 340, 250);
+        setScaledBounds(dicePanel, 130, 167, 340, 250);
         dicePanel.setOpaque(false);
         centerPanel.add(dicePanel);
 
         // Roll Dice Button
         JButton rollDiceButton = new JButton("Roll Dice");
-        rollDiceButton.setBounds(250, 370, 100, 30);
-        rollDiceButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                dice.rollDice();
-                dicePanel.repaint();
-            }
-        });
-        centerPanel.add(rollDiceButton);
+        setScaledBounds(rollDiceButton, 250, 370, 100, 30);
 
         boardPanel.add(centerPanel);
 
@@ -187,88 +365,18 @@ public class MonopolyBoardSwing extends JFrame {
         buttonPanel.add(rollDiceButton);
 
         buttonPanel.add(quitButton);
-        buttonPanel.setBounds(300, 800, 500, 50);
+        setScaledBounds(buttonPanel, 300, 800, 500, 50);
 
         boardPanel.add(buttonPanel);
+
+        Color[] tokenColors = BoardData.TOKEN_COLORS;
+        Tokens[] tokens = BoardData.TOKENS;
+        PlayerPanelSection playerPanelSection = buildPlayerPanelSection(boardPanel, numberOfPlayers, tokenColors, tokens);
 
         // Add the background panel to the frame
         frame.add(boardPanel);
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
-
-        // Player Panel
-        playerPanel = new JPanel();
-        playerPanel.setLayout(null);
-        playerPanel.setBounds(850, 50, 450, 700);
-        playerPanel.setBackground(Color.WHITE);
-
-        Color[] tokenColors = { Color.RED, Color.BLUE, Color.GREEN, Color.ORANGE, Color.MAGENTA, Color.CYAN, Color.PINK,
-                new Color(12, 34, 54) };
-        Tokens[] tokens = { Tokens.A, Tokens.B, Tokens.C, Tokens.D, Tokens.E, Tokens.G, Tokens.H, Tokens.I };
-        walletLabels = new JLabel[numberOfPlayers];
-        playerPanels = new JPanel[numberOfPlayers];
-
-        for (int i = 0; i < numberOfPlayers; i++) {
-            Player player = new Player("Player " + (i + 1)); // Use constructor to set name and token
-
-            String name = player.getName();
-            int wallet = player.getWallet();
-            Tokens token = tokens[i]; // Get token (A, B, C...)
-
-            // Assign a unique color from the array (loops if more players)
-            Color tokenColor = tokenColors[i % tokenColors.length];
-
-            // Create player panel with token circle
-            JPanel playerInfoPanel = new JPanel() {
-                @Override
-                protected void paintComponent(Graphics g) {
-                    super.paintComponent(g);
-                    // Draw Token Circle
-                    g.setColor(tokenColor);
-                    g.fillOval(80, 40, 40, 40); // Adjusted position
-
-                    // Draw Token Letter inside Circle
-                    g.setColor(Color.WHITE);
-                    g.setFont(new Font("Arial", Font.BOLD, 20));
-                    g.drawString(String.valueOf(token), 95, 67
-
-                    ); // Centered text
-                }
-            };
-
-            playerInfoPanel.setLayout(new BoxLayout(playerInfoPanel, BoxLayout.Y_AXIS));
-            playerInfoPanel.setBackground(Color.LIGHT_GRAY);
-            playerInfoPanel.setBounds(i < (numberOfPlayers + 1) / 2 ? 10 : 220,
-                    ((i % ((numberOfPlayers + 1) / 2)) * 150) + 10, 200, 120);
-
-            JLabel playerLabel = new JLabel(name);
-            JLabel walletLabel = new JLabel("Wallet: $" + wallet);
-            walletLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-            walletLabels[i] = walletLabel;
-            playerLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-            playerPanels[i] = playerInfoPanel;
-
-            playerInfoPanel.add(playerLabel);
-            playerInfoPanel.add(walletLabel);
-            playerPanel.add(playerInfoPanel);
-
-            // Add vertical separator after left column
-            if (i == (numberOfPlayers + 1) / 2 - 1) {
-                JSeparator separatorr = new JSeparator(SwingConstants.VERTICAL);
-                separatorr.setBounds(213, 0, 10, ((numberOfPlayers + 1) / 2) * 150);
-                separatorr.setForeground(Color.BLACK);
-                playerPanel.add(separatorr);
-            }
-
-            // Add horizontal separators
-            if (i < numberOfPlayers - 1) {
-                JSeparator separator = new JSeparator();
-                separator.setBounds(10, (i * 150) + 150, 380, 10);
-                playerPanel.add(separator);
-            }
-        }
-        boardPanel.add(playerPanel);
 
         players = new Player[numberOfPlayers];
         playerTokens = new JLabel[numberOfPlayers];
@@ -286,63 +394,51 @@ public class MonopolyBoardSwing extends JFrame {
         // Make only first player's token visible at start
         playerTokens[0].setVisible(true);
 
-        // Modify the rollDiceButton ActionListener:
-        rollDiceButton.addActionListener(e -> {
-            // If this is the first roll, make all tokens visible
-            boolean isFirstRoll = true;
-            for (int i = 1; i < playerTokens.length; i++) {
-                if (playerTokens[i].isVisible()) {
-                    isFirstRoll = false;
-                    break;
-                }
+        configureTurnController(rollDiceButton, dice, dicePanel, frame, numberOfPlayers, spaces);
+
+        applyScaledLayout(
+                boardGridSection.goPanel,
+                boardGridSection.jailPanel,
+                boardGridSection.freeParkingPanel,
+                boardGridSection.goToJailPanel,
+                boardGridSection.topRow,
+                boardGridSection.bottomRow,
+                boardGridSection.leftColumn,
+                boardGridSection.rightColumn,
+                centerPanel,
+                dicePanel,
+                rollDiceButton,
+                buttonPanel,
+                playerPanelSection.playerInfoPanels,
+                playerPanelSection.verticalSeparator,
+                playerPanelSection.horizontalSeparators,
+                numberOfPlayers);
+
+        frame.addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                Dimension contentSize = frame.getContentPane().getSize();
+                updateScaleForFrameSize(contentSize.width, contentSize.height);
+                applyScaledLayout(
+                    boardGridSection.goPanel,
+                    boardGridSection.jailPanel,
+                    boardGridSection.freeParkingPanel,
+                    boardGridSection.goToJailPanel,
+                    boardGridSection.topRow,
+                    boardGridSection.bottomRow,
+                    boardGridSection.leftColumn,
+                    boardGridSection.rightColumn,
+                        centerPanel,
+                        dicePanel,
+                        rollDiceButton,
+                        buttonPanel,
+                    playerPanelSection.playerInfoPanels,
+                    playerPanelSection.verticalSeparator,
+                    playerPanelSection.horizontalSeparators,
+                        numberOfPlayers);
+                boardPanel.revalidate();
+                boardPanel.repaint();
             }
-            if (isFirstRoll) {
-                for (JLabel token : playerTokens) {
-                    token.setVisible(true);
-                }
-            }
-
-            dice.rollDice();
-            dicePanel.repaint();
-
-            // Get current player
-            Player currentPlayer = players[currentPlayerIndex];
-
-            // Calculate new position
-            int diceSum = dice.getDice1() + dice.getDice2();
-            int newPosition = (currentPlayer.getPosition() + diceSum) % BOARD_SIZE;
-
-            // Move current player's token
-            movePlayer(currentPlayer, newPosition);
-
-            // Check if passed GO
-            if (newPosition < currentPlayer.getPosition()) {
-                currentPlayer.setWallet(currentPlayer.getWallet() + 200);
-                JOptionPane.showMessageDialog(frame,
-                        currentPlayer.getName() + " passed GO! Collected $200",
-                        "Passed GO",
-                        JOptionPane.INFORMATION_MESSAGE);
-                updatePlayerPanel(currentPlayerIndex);
-            }
-
-            // Handle the space the player landed on
-            Space currentSpace = spaces[newPosition];
-            handlePropertyLanding(currentPlayer, currentSpace, frame);
-
-            // Update player's position
-            currentPlayer.setPosition(newPosition);
-
-            // Move to next player
-            currentPlayerIndex = (currentPlayerIndex + 1) % numberOfPlayers;
-
-            // Update the active player's panel
-            highlightCurrentPlayer(currentPlayerIndex);
-
-            // Announce next player's turn
-            JOptionPane.showMessageDialog(frame,
-                    "It's " + players[currentPlayerIndex].getName() + "'s turn!",
-                    "Next Turn",
-                    JOptionPane.INFORMATION_MESSAGE);
         });
     }
 
@@ -351,24 +447,27 @@ public class MonopolyBoardSwing extends JFrame {
         JLabel tokenLabel = new JLabel(token.toString()) {
             @Override
             protected void paintComponent(Graphics g) {
+                int tokenSize = Math.min(getWidth(), getHeight());
+
                 // Draw a circle with the specified color
                 g.setColor(color);
-                g.fillOval(0, 0, 40, 40); // 40x40 circle
+                g.fillOval(0, 0, tokenSize, tokenSize);
 
                 // Draw the token text in the center of the circle
                 g.setColor(Color.WHITE); // Text color
+                g.setFont(new Font("Arial", Font.BOLD, Math.max(12, s(16))));
                 FontMetrics fm = g.getFontMetrics();
                 String text = token.toString();
                 int textWidth = fm.stringWidth(text);
                 int textHeight = fm.getAscent();
-                int x = (40 - textWidth) / 2; // Center horizontally
-                int y = (40 - textHeight) / 2 + fm.getAscent(); // Center vertically
+                int x = (tokenSize - textWidth) / 2; // Center horizontally
+                int y = (tokenSize - textHeight) / 2 + fm.getAscent(); // Center vertically
                 g.drawString(text, x, y);
             }
         };
 
-        // Set the size of the JLabel to 40x40 pixels
-        tokenLabel.setSize(40, 40); // Fixed size for positioning
+        // Set the initial token size for positioning on the board.
+        tokenLabel.setSize(s(40), s(40));
         tokenLabel.setHorizontalAlignment(SwingConstants.CENTER);
         tokenLabel.setVerticalAlignment(SwingConstants.CENTER);
 
@@ -379,7 +478,7 @@ public class MonopolyBoardSwing extends JFrame {
     }
 
     private static void positionToken(JLabel token, int position) {
-        token.setLocation(xCoordinates[position], yCoordinates[position]);
+        token.setLocation(s(BoardData.X_COORDINATES[position]), s(BoardData.Y_COORDINATES[position]));
     }
 
     private static void movePlayer(Player player, int newPosition) {
@@ -455,12 +554,8 @@ public class MonopolyBoardSwing extends JFrame {
     }
 
     private static Color getPlayerTokenColor(int playerIndex) {
-        // Define token colors (same as in the player initialization)
-        Color[] tokenColors = { Color.RED, Color.BLUE, Color.GREEN, Color.ORANGE, Color.MAGENTA, Color.CYAN, Color.PINK,
-                new Color(12, 34, 54) };
-
-        if (playerIndex >= 0 && playerIndex < tokenColors.length) {
-            return tokenColors[playerIndex];
+        if (playerIndex >= 0 && playerIndex < BoardData.TOKEN_COLORS.length) {
+            return BoardData.TOKEN_COLORS[playerIndex];
         }
         return Color.LIGHT_GRAY; // Default color if player index is invalid
     }
@@ -540,13 +635,11 @@ public class MonopolyBoardSwing extends JFrame {
         // Draw a Chance card
         String drawnCard = chance.drawchCard();
 
-        // Show the drawn card with a custom icon (optional)
-        ImageIcon icon = new ImageIcon("chance_icon.png"); // Add an icon image if desired
+        // Show the drawn card
         JOptionPane.showMessageDialog(frame,
                 drawnCard,
                 "Chance Card",
-                JOptionPane.INFORMATION_MESSAGE,
-                icon);
+            JOptionPane.INFORMATION_MESSAGE);
 
         // Handle the card's effect
         handleChanceEffect(currentPlayer, drawnCard, frame);
@@ -710,13 +803,11 @@ public class MonopolyBoardSwing extends JFrame {
         // Removed unused variable cardParts
         // String cardTitle = cardParts[0]; // Removed unused variable
 
-        // Show the drawn card with custom icon
-        ImageIcon icon = new ImageIcon("community_chest_icon.png"); // You can add an icon image
+        // Show the drawn card
         JOptionPane.showMessageDialog(frame,
                 drawnCard,
                 "Community Chest Card",
-                JOptionPane.INFORMATION_MESSAGE,
-                icon);
+            JOptionPane.INFORMATION_MESSAGE);
 
         // Handle the card's effect
         if (drawnCard.contains("Collect $200")) {
@@ -840,27 +931,6 @@ public class MonopolyBoardSwing extends JFrame {
 
         currentPlayer.setWallet(currentPlayer.getWallet() - taxAmount);
         updatePlayerPanel(getCurrentPlayerIndex());
-    }
-
-    static class BackgroundPanel extends JPanel {
-        private Image backgroundImage;
-
-        BackgroundPanel(String imagePath) {
-            try {
-                backgroundImage = new ImageIcon(imagePath).getImage();
-            } catch (Exception e) {
-                System.err.println("Error loading background image: " + e.getMessage());
-            }
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            if (backgroundImage != null) {
-                g.drawImage(backgroundImage, 0, 0, 800, 800, this);
-            }
-        }
-
     }
 
 }

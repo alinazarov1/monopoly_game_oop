@@ -1,10 +1,10 @@
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 
 public class CommunityChest {
-    final List<String> cards;
+    private final List<String> cards;
+    private int currentCardIndex;
 
     public CommunityChest() {
         cards = new ArrayList<>();
@@ -30,17 +30,20 @@ public class CommunityChest {
         cards.add("Pay a fine of $20.");
         cards.add("Take a loan of $150. Pay back with 10% interest.");
         cards.add("You are required to sell property. Choose one property to sell to the bank for $100.");
+        shuffleCards();
     }
 
     public String drawCard() {
-        // Shuffle the cards to ensure randomness
+        if (currentCardIndex >= cards.size()) {
+            shuffleCards();
+        }
+
+        return cards.get(currentCardIndex++);
+    }
+
+    private void shuffleCards() {
         Collections.shuffle(cards);
-
-        // Randomly select a card after shuffling
-        Random random = new Random();
-        int index = random.nextInt(cards.size());
-
-        return cards.get(index);
+        currentCardIndex = 0;
     }
 
 }

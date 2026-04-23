@@ -2,6 +2,7 @@ import java.awt.*;
 import java.util.Random;
 
 public class Dice {
+    private final Random random = new Random();
     private int dice1;
     private int dice2;
     private boolean isDouble;
@@ -14,7 +15,6 @@ public class Dice {
 
     // Roll the dice to get random values between 1 and 6
     public void rollDice() {
-        Random random = new Random();
         dice1 = random.nextInt(6) + 1;
         dice2 = random.nextInt(6) + 1;
 
