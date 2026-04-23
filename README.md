@@ -23,6 +23,36 @@ From the repository root:
 javac *.java
 ```
 
+Or with Maven:
+
+```bash
+mvn clean compile
+```
+
+## Test
+
+Run unit tests with Maven:
+
+```bash
+mvn test
+```
+
+Current tests cover `Player`, `Space`, and `GameRules` logic.
+
+## Package (Executable Jar)
+
+Build executable jar:
+
+```bash
+mvn clean package
+```
+
+Run packaged jar:
+
+```bash
+java -jar target/monopoly-game-oop-1.0.0.jar
+```
+
 ## Run
 
 After building:
@@ -47,12 +77,13 @@ Implemented:
 - Active player highlighting
 - Responsive/laptop-friendly UI scaling
 - Live board relayout on window resize
+- Bankruptcy elimination
+- Winner detection when one active player remains
 
 Partially implemented / simplified rules:
 
 - No full monopoly ruleset (houses/hotels/mortgages/trades/auctions)
 - Jail system is basic (no full turn/roll logic)
-- Bankruptcy/win conditions are not finalized
 - Some card effects are simplified
 
 ## Notes

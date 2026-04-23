@@ -18,6 +18,7 @@ public class MonopolyBoardSwing extends JFrame {
     private static JPanel playerPanel;
     private static JLabel[] walletLabels;
     private static JPanel[] playerPanels;
+    private static Space[] gameSpaces;
     private static final Chance chance = new Chance(); // Add this as a class variable
 
     private static int s(int value) {
@@ -289,7 +290,23 @@ public class MonopolyBoardSwing extends JFrame {
             handlePropertyLanding(currentPlayer, currentSpace, frame);
             currentPlayer.setPosition(newPosition);
 
-            currentPlayerIndex = (currentPlayerIndex + 1) % numberOfPlayers;
+            if (isPlayerBankrupt(currentPlayer)) {
+                eliminatePlayer(currentPlayer, frame);
+            }
+
+            Player winner = GameRules.findWinner(players);
+            if (winner != null) {
+                announceWinnerAndDisableRoll(winner, frame, rollDiceButton);
+                highlightCurrentPlayer(getPlayerIndex(winner));
+                return;
+            }
+
+            currentPlayerIndex = GameRules.getNextActivePlayerIndex(players, currentPlayerIndex);
+            if (currentPlayerIndex == -1) {
+                rollDiceButton.setEnabled(false);
+                return;
+            }
+
             highlightCurrentPlayer(currentPlayerIndex);
 
             JOptionPane.showMessageDialog(frame,
@@ -315,6 +332,7 @@ public class MonopolyBoardSwing extends JFrame {
         boardPanel.setLayout(null);
 
         Space[] spaces = BoardData.createSpaces();
+        gameSpaces = spaces;
         BoardGridSection boardGridSection = buildBoardGridSection(boardPanel, spaces);
 
         // Center Area (Middle of the board)
@@ -507,8 +525,13 @@ public class MonopolyBoardSwing extends JFrame {
 
     private static void highlightCurrentPlayer(int playerIndex) {
         // Remove highlight from all player panels
-        for (JPanel panel : playerPanels) {
-            panel.setBackground(Color.LIGHT_GRAY);
+        for (int i = 0; i < playerPanels.length; i++) {
+            JPanel panel = playerPanels[i];
+            if (players != null && i < players.length && players[i] != null && !players[i].isActive()) {
+                panel.setBackground(new Color(230, 230, 230));
+            } else {
+                panel.setBackground(Color.LIGHT_GRAY);
+            }
         }
 
         // Highlight current player's panel
@@ -518,6 +541,40 @@ public class MonopolyBoardSwing extends JFrame {
 
         playerPanel.revalidate();
         playerPanel.repaint();
+    }
+
+    private static boolean isPlayerBankrupt(Player player) {
+        return GameRules.isBankrupt(player);
+    }
+
+    private static void eliminatePlayer(Player player, JFrame frame) {
+        player.setActive(false);
+
+        if (gameSpaces != null) {
+            for (Space space : gameSpaces) {
+                if (space.getOwner() == player) {
+                    space.setOwner(null);
+                }
+            }
+        }
+
+        int bankruptIndex = getPlayerIndex(player);
+        if (bankruptIndex >= 0 && bankruptIndex < playerTokens.length) {
+            playerTokens[bankruptIndex].setVisible(false);
+        }
+
+        JOptionPane.showMessageDialog(frame,
+                player.getName() + " is bankrupt and eliminated from the game.",
+                "Bankruptcy",
+                JOptionPane.WARNING_MESSAGE);
+    }
+
+    private static void announceWinnerAndDisableRoll(Player winner, JFrame frame, JButton rollDiceButton) {
+        rollDiceButton.setEnabled(false);
+        JOptionPane.showMessageDialog(frame,
+                winner.getName() + " wins the game!",
+                "Game Over",
+                JOptionPane.INFORMATION_MESSAGE);
     }
 
     private static JPanel createGridSquare(Space space, int width, int height) {

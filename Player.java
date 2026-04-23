@@ -4,11 +4,13 @@ public class Player {
     private int wallet;
     private int position;
     private int getOutOfJailFreeCards = 0;
+    private boolean active;
 
     public Player(String name) {
         this.name = name;
         this.wallet = 1500; // Starting money
         this.position = 0;
+        this.active = true;
     }
 
     // Remove the getToken() method since we'll use names instead
@@ -38,6 +40,14 @@ public class Player {
 
     public int getGetOutOfJailFreeCards() {
         return getOutOfJailFreeCards;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
     }
 
 }
